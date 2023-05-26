@@ -1,0 +1,56 @@
+version: '3'
+
+volumes:
+  db:
+    driver: local
+
+services:
+  php:
+    container_name: php
+    restart: unless-stopped
+    build:
+      context: ./docker
+      dockerfile: php.dockerfile
+      args:
+        - PHP_VERSION=8.2.5
+    volumes:
+      - ./:/var/www
+    expose:
+      - "9000"
+    working_dir: /var/www
+
+  nginx:
+    container_name: webserver
+    restart: unless-stopped
+    build:
+      context: ./docker
+      dockerfile: nginx.dockerfile
+      args:
+        - NGINX_VERSION=1.23.3
+        - PHP_UPSTREAM_CONTAINER=php
+        - PHP_UPSTREAM_PORT=9000
+    volumes:
+      - ./:/var/www
+      - ./docker/logs/:/var/log/nginx
+      - ./docker/sites/:/etc/nginx/sites-available
+    ports:
+      - "${APP_PORT:-80}:80"
+    expose:
+      - "${APP_PORT:-80}"
+    depends_on:
+      - php
+
+  db:
+    container_name: database
+    image: mysql
+    restart: unless-stopped
+    tty: true
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DB_USERNAME:-root}
+      - MYSQL_USER=${DB_USERNAME:-user}
+      - MYSQL_PASSWORD=${DB_PASSWORD:-user}
+      - MYSQL_DATABASE=${DB_DATABASE:-laravel}
+    ports:
+      - '${DB_PORT:-3306}:3306'
+    volumes:
+      - db:/var/lib/mysql/
